@@ -11,6 +11,7 @@ import Nav from "react-bootstrap/Nav";
 import InputGroup from "react-bootstrap/InputGroup";
 import Col from "react-bootstrap/Col";
 import Table from "react-bootstrap/Table";
+import axios from "axios";
 
 
 const useEventSource = (url) => {
@@ -29,6 +30,16 @@ const useEventSource = (url) => {
 
 const App = () => {
     const [subscriptions, setSubscriptions] = useState([])
+
+    const sendSubs = (cmd) => {
+        axios.post('/http://localhost:8888/subscriptions', {
+            cmd: cmd,
+        }).then((response) => {
+            setSubscriptions([...subscriptions, response.data]);
+        }, (error) => {
+            console.log(error);
+        });
+    }
 
     useEffect(() => {
         const source = new EventSource('http://localhost:8888/subscriptions/stats');
@@ -64,7 +75,10 @@ const App = () => {
                                 aria-label="Recipient's username"
                                 aria-describedby="basic-addon2"
                             />
-                            <Button variant="outline-secondary" id="button-addon2">
+                            <Button variant="outline-secondary" id="button-addon2" onClick={(e) => {
+                                e.preventDefault();
+                                sendSubs("");
+                            }}>
                                 Add
                             </Button>
                         </InputGroup>
