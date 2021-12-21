@@ -7,20 +7,24 @@ import it.gdgpistoia.operator.SubsriptionsParser;
 import it.gdgpistoia.operator.TweetsParser;
 import it.gdgpistoia.operator.TweetsPerSearchCriteria;
 import lombok.val;
+import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.streaming.api.datastream.ConnectedStreams;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer;
+import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer;
 import org.apache.flink.streaming.connectors.twitter.TwitterSource;
 
 import java.util.*;
 
+import org.apache.flink.util.Collector;
 import twitter4j.Status;
 
 import static it.gdgpistoia.utils.PropertiesLoader.*;
@@ -88,6 +92,16 @@ public class StreamingJob {
 		//ritorna la statistica, la key  e tutte le subscriptions per successive elaborazioni
 		SingleOutputStreamOperator<Tuple3<String, Set<String>, Statistic>> stats = keyedTweetsAndConfigurations.flatMap(new Aggregator());
 		stats.print();
+
+		stats.flatMap(new FlatMapFunction<Tuple3<String, Set<String>, Statistic>, String>() {
+			private static final long serialVersionUID = -1940426969655789355L;
+
+			@Override
+			public void flatMap(Tuple3<String, Set<String>, Statistic> stringSetStatisticTuple3, Collector<String> collector) throws Exception {
+				ObjectMapper objectMapper = new ObjectMapper();
+				collector.collect(objectMapper.writeValueAsString(stringSetStatisticTuple3));
+			}
+		}).addSink(new FlinkKafkaProducer<>("stats", new SimpleStringSchema(), kafkaProperties));
 
 		// execute program
 		env.execute("Twitter Aggregator Job");
