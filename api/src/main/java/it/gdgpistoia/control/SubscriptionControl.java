@@ -17,7 +17,7 @@ public class SubscriptionControl {
 
     public void send(Subscription subscription){
         try {
-            producer.sendToKafka(subscription);
+            producer.sentRecordToKafka(subscription);
         } catch (JsonProcessingException e) {
             log.info("operationName=sendSubscriptionToKafka message={}", e.getMessage());
         }
