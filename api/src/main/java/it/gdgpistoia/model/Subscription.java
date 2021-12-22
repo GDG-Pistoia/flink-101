@@ -7,6 +7,7 @@ import lombok.ToString;
 @Getter
 @Setter
 @ToString
-public class Subscription extends BaseEntity {
+public class Subscription{
+    Integer id;
     String cmd;
 }

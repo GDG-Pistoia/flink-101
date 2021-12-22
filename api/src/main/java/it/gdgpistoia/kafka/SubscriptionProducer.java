@@ -17,13 +17,13 @@ public class SubscriptionProducer {
 
     @Inject
     @Channel("subscriptions-out")
-    Emitter<Record<String, String>> emitter;
+    Emitter<Record<Integer, String>> emitter;
 
     @Inject
     ObjectMapper objectMapper;
 
     public void sentRecordToKafka(Subscription subscription) throws JsonProcessingException {
         log.info("operationName=sentRecordToKafka subscription={}", subscription);
-        emitter.send(Record.of(subscription.getUuid(), objectMapper.writeValueAsString(subscription.getCmd())));
+        emitter.send(Record.of(subscription.getId(), objectMapper.writeValueAsString(subscription.getCmd())));
     }
 }

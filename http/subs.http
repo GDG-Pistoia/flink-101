@@ -1,0 +1,9 @@
+POST http://localhost:8888/subscriptions
+Content-Type: application/json
+
+{
+  "id": 1,
+  "cmd": "Lorenzo,+,@maronnakkkkk"
+}
+
+###
