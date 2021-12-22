@@ -42,34 +42,21 @@ public class StreamingJob {
 				.build();
 
 		Properties properties = load("twitter.properties");
-
 		TwitterSource twitterSource = new TwitterSource(properties);
 
-		DataStream<String> tweetsAsStrings = env.addSource(twitterSource);
+		DataStream<Tuple2<String, Status>> classifiedTweets =
+				env.addSource(twitterSource)
+						.flatMap(new TweetsParser())
+						.flatMap(new TweetsPerSearchCriteria());
 
-		DataStream<Status> tweets = tweetsAsStrings.flatMap(new TweetsParser());
+		DataStream<Tuple3<String, String, String>> configurations = env.addSource(
+				new FlinkKafkaConsumer<>("subscriptions", new SimpleStringSchema(), kafkaProperties))
+				.map(new SubsriptionsParser());
 
-		DataStream<Tuple2<String, Status>> classifiedTweets = tweets.flatMap(new TweetsPerSearchCriteria());
 
-		//Subs example: Lorenzo,+,#HR
-		DataStream<String> configurationsAsStrings = env.addSource(
-				new FlinkKafkaConsumer<>("subscriptions", new SimpleStringSchema(), kafkaProperties));
-		//Crea un DataStream dalla collection
-		DataStream<Tuple3<String, String, String>> configurations = configurationsAsStrings.map(new SubsriptionsParser());
-		configurations.addSink(new SinkFunction<Tuple3<String, String, String>>() {
-			private static final long serialVersionUID = -3912958066159318348L;
-
-			@Override
-			public void invoke(Tuple3<String, String, String> value, Context context) throws Exception {
-				System.out.println("New subscription recived " + value);
-			}
-		});
-
-		ConnectedStreams<Tuple2<String, Status>, Tuple3<String, String, String>> tweetsAndConfigurations = classifiedTweets.connect(configurations);
-
-		//partiziona lo  stream (connected) usando un key extractor.
-		ConnectedStreams<Tuple2<String, Status>, Tuple3<String, String, String>> keyedTweetsAndConfigurations =
-				tweetsAndConfigurations.keyBy(
+		SingleOutputStreamOperator<Tuple3<String, Set<String>, Statistic>> stats =
+				classifiedTweets.connect(configurations)
+						.keyBy(
 						new KeySelector<Tuple2<String, Status>, String>() {
 							private static final long serialVersionUID = -4323014925589200149L;
 
@@ -86,11 +73,8 @@ public class StreamingJob {
 								return value.f0;
 							}
 						}
-				);
+				).flatMap(new Aggregator());
 
-		//processa i due stream accoppiati
-		//ritorna la statistica, la key  e tutte le subscriptions per successive elaborazioni
-		SingleOutputStreamOperator<Tuple3<String, Set<String>, Statistic>> stats = keyedTweetsAndConfigurations.flatMap(new Aggregator());
 		stats.print();
 
 		stats.flatMap(new FlatMapFunction<Tuple3<String, Set<String>, Statistic>, String>() {
@@ -103,7 +87,6 @@ public class StreamingJob {
 			}
 		}).addSink(new FlinkKafkaProducer<>("stats", new SimpleStringSchema(), kafkaProperties));
 
-		// execute program
 		env.execute("Twitter Aggregator Job");
 	}
 }
